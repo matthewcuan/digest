@@ -1,5 +1,6 @@
 """Collects items from feeds, Anthropic's sitemap, Hacker News, and GitHub."""
 
+import gzip
 import html
 import json
 import logging
@@ -22,7 +23,9 @@ SITEMAP = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
 def _get(url: str) -> bytes:
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=20) as resp:
-        return resp.read()
+        body = resp.read()
+    # Some servers (DeepMind) gzip the response even when it wasn't requested.
+    return gzip.decompress(body) if body[:2] == b"\x1f\x8b" else body
 
 
 def _clean(text: str | None, limit: int = 400) -> str:
