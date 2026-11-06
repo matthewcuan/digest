@@ -1,4 +1,4 @@
-# AI digest
+﻿# AI digest
 
 A Lambda that runs daily at 7am Pacific and emails a digest:
 
@@ -20,7 +20,7 @@ sam deploy
 
 After the first deploy:
 
-1. Click the verification link SES emails to the address in `samconfig.toml`.
+1. The address in `samconfig.toml` must already be a verified SES identity in us-east-2.
 2. Make sure Claude Haiku 5.5 is enabled under [Bedrock model access](https://console.aws.amazon.com/bedrock/home#/modelaccess).
 
 ## Test it

@@ -5,7 +5,7 @@ Description: Daily AI digest email (blogs, news, Hacker News, GitHub), summarize
 Parameters:
   Email:
     Type: String
-    Description: Address the digest is sent to and from. SES emails it a verification link on first deploy.
+    Description: Address the digest is sent to and from. Must already be a verified SES identity in this region.
   ModelId:
     Type: String
     Default: anthropic.claude-haiku-5-5
@@ -73,11 +73,6 @@ Resources:
       TimeToLiveSpecification:
         AttributeName: expires
         Enabled: true
-
-  SenderIdentity:
-    Type: AWS::SES::EmailIdentity
-    Properties:
-      EmailIdentity: !Ref Email
 
 Outputs:
   FunctionName:
