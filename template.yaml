@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Daily AI digest email (blogs, news, Hacker News, GitHub), summarized by Claude Haiku on Bedrock.
+
+Parameters:
+  Email:
+    Type: String
+    Description: Address the digest is sent to and from. SES emails it a verification link on first deploy.
+  ModelId:
+    Type: String
+    Default: anthropic.claude-haiku-5-5
+  ScheduleCron:
+    Type: String
+    Default: cron(0 7 * * ? *)
+    Description: When to send, in ScheduleTimezone.
+  ScheduleTimezone:
+    Type: String
+    Default: America/Los_Angeles
+
+Resources:
+  DigestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.handler
+      Runtime: python3.13
+      Architectures: [arm64]
+      MemorySize: 512
+      Timeout: 180
+      LoggingConfig:
+        LogGroup: !Ref DigestLogs
+      Environment:
+        Variables:
+          EMAIL: !Ref Email
+          MODEL_ID: !Ref ModelId
+          SEEN_TABLE: !Ref SeenTable
+          DIGEST_TZ: !Ref ScheduleTimezone
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SeenTable
+        - Statement:
+            - Effect: Allow
+              Action: ses:SendEmail
+              Resource: !Sub arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${Email}
+            - Effect: Allow
+              Action: bedrock-mantle:CreateInference
+              Resource: "*"
+      Events:
+        Daily:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: !Ref ScheduleCron
+            ScheduleExpressionTimezone: !Ref ScheduleTimezone
+            RetryPolicy:
+              MaximumRetryAttempts: 1
+
+  DigestLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      RetentionInDays: 30
+
+  # Links already emailed, so nothing shows up twice. Entries expire after 60 days.
+  SeenTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: url
+          AttributeType: S
+      KeySchema:
+        - AttributeName: url
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expires
+        Enabled: true
+
+  SenderIdentity:
+    Type: AWS::SES::EmailIdentity
+    Properties:
+      EmailIdentity: !Ref Email
+
+Outputs:
+  FunctionName:
+    Value: !Ref DigestFunction
