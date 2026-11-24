@@ -41,7 +41,11 @@ Resources:
         - Statement:
             - Effect: Allow
               Action: ses:SendEmail
-              Resource: !Sub arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${Email}
+              Resource:
+                - !Sub arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${Email}
+                # SES also authorizes against any default configuration set on the identity
+                # (another project, job-crm, sets one on this address).
+                - !Sub arn:aws:ses:${AWS::Region}:${AWS::AccountId}:configuration-set/*
             - Effect: Allow
               Action: bedrock-mantle:CreateInference
               Resource: "*"
