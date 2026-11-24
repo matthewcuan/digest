@@ -8,7 +8,7 @@ Parameters:
     Description: Address the digest is sent to and from. Must already be a verified SES identity in this region.
   ModelId:
     Type: String
-    Default: anthropic.claude-haiku-5-5
+    Default: us.anthropic.claude-haiku-4-5-20251001-v1:0
   ScheduleCron:
     Type: String
     Default: cron(0 7 * * ? *)
@@ -47,8 +47,10 @@ Resources:
                 # (another project, job-crm, sets one on this address).
                 - !Sub arn:aws:ses:${AWS::Region}:${AWS::AccountId}:configuration-set/*
             - Effect: Allow
-              Action: bedrock-mantle:CreateInference
-              Resource: "*"
+              Action: bedrock:InvokeModel
+              Resource:
+                - arn:aws:bedrock:*:*:inference-profile/us.anthropic.claude-*
+                - arn:aws:bedrock:*::foundation-model/anthropic.claude-*
       Events:
         Daily:
           Type: ScheduleV2

@@ -7,7 +7,7 @@ A Lambda that runs daily at 7am Pacific and emails a digest:
 - **On Hacker News:** AI stories on the front page
 - **Trending repos:** the most-starred new GitHub repos tagged `llm`, `ai-agents`, `generative-ai` or `machine-learning`
 
-Claude Haiku 5.5 on Bedrock writes a one-sentence summary for each item. A DynamoDB table remembers the links it has already sent, so nothing shows up twice. Sources, caps and keywords are all in `src/sources.py`.
+Claude Haiku 4.5 on Bedrock (through the Converse API) writes a one-sentence summary for each item. A DynamoDB table remembers the links it has already sent, so nothing shows up twice. Sources, caps and keywords are all in `src/sources.py`.
 
 ## Deploy
 
@@ -21,7 +21,7 @@ sam deploy
 After the first deploy:
 
 1. The address in `samconfig.toml` must already be a verified SES identity in us-east-2.
-2. Make sure Claude Haiku 5.5 is enabled under [Bedrock model access](https://console.aws.amazon.com/bedrock/home#/modelaccess).
+2. Make sure Claude Haiku 4.5 is enabled under [Bedrock model access](https://console.aws.amazon.com/bedrock/home#/modelaccess).
 
 ## Test it
 
@@ -38,5 +38,5 @@ Logs: `sam logs -n DigestFunction --tail`
 ## Change it
 
 - **Time or timezone:** `ScheduleCron` / `ScheduleTimezone` in `template.yaml`
-- **Model:** `ModelId` in `template.yaml` (for example `anthropic.claude-sonnet-5-5`)
+- **Model:** `ModelId` in `template.yaml`. It must be a model the Converse API serves, such as an inference profile ID like `us.anthropic.claude-haiku-4-5-20251001-v1:0`. Haiku 5.5 and other newer models are only on Bedrock's `bedrock-mantle` endpoint; to use one, restore the `AnthropicBedrockMantle` version of `src/summarize.py` from git history.
 - **Sources:** `src/sources.py`
