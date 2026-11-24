@@ -7,7 +7,7 @@ A Lambda that runs daily at 7am Pacific and emails a digest:
 - **On Hacker News:** AI stories on the front page
 - **Trending repos:** the most-starred new GitHub repos tagged `llm`, `ai-agents`, `generative-ai` or `machine-learning`
 
-Claude Haiku 4.5 on Bedrock (through the Converse API) writes a one-sentence summary for each item. A DynamoDB table remembers the links it has already sent, so nothing shows up twice. Sources, caps and keywords are all in `src/sources.py`.
+Claude Haiku 4.5 on Bedrock (through the Converse API) writes a one-sentence summary for each item and scores it 1–10 for importance. Each section shows its top-scored items; duplicate coverage of the same story and spam score 1 and are left out (`MIN_SCORE`). A DynamoDB table remembers the links it has already sent, so nothing shows up twice. Sources, caps and keywords are all in `src/sources.py`.
 
 ## Deploy
 

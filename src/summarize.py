@@ -15,12 +15,25 @@ log = logging.getLogger(__name__)
 MODEL_ID = os.environ.get("MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
 BEDROCK = boto3.client("bedrock-runtime")
 
-PROMPT = """Below is a JSON list of AI-related items from today: blog posts, news, \
-Hacker News stories, and GitHub repos. For each item, write one plain sentence \
-(at most 25 words) saying what it is or what was announced. Use only the title and \
-snippet given; if they are too thin to say more, restate the title as a sentence. \
-No hype, no "this article discusses". Return a summary for every id by calling \
-the save_summaries tool.
+PROMPT = """Below is a JSON list of AI-related items from today: blog posts from AI labs, \
+news stories, Hacker News posts, and new GitHub repos. They go into a daily digest \
+for someone who follows AI closely and wants only what matters.
+
+For every item, return:
+- summary: one plain sentence (at most 25 words) saying what it is or what was \
+announced. Use only the title and snippet given; if they are too thin to say more, \
+restate the title as a sentence. No hype, no "this article discusses".
+- score: an integer from 1 to 10 for how much it matters to that reader.
+  9-10: major model or product launches, significant research results, big \
+industry or policy moves.
+  5-8: notable releases, useful technical posts, meaningful company news.
+  1-4: customer case studies, marketing, event recaps, minor updates, opinion \
+pieces with no news.
+  When several items cover the same story, give the most informative one its \
+normal score and the rest 1.
+  Score GitHub repos on how useful or novel the project looks, not star count alone.
+
+Return every id by calling the save_summaries tool.
 
 {items}"""
 
@@ -28,7 +41,7 @@ the save_summaries tool.
 TOOL = {
     "toolSpec": {
         "name": "save_summaries",
-        "description": "Save the one-sentence summary for each item.",
+        "description": "Save the one-sentence summary and importance score for each item.",
         "inputSchema": {"json": {
             "type": "object",
             "properties": {
@@ -36,8 +49,12 @@ TOOL = {
                     "type": "array",
                     "items": {
                         "type": "object",
-                        "properties": {"id": {"type": "integer"}, "summary": {"type": "string"}},
-                        "required": ["id", "summary"],
+                        "properties": {
+                            "id": {"type": "integer"},
+                            "summary": {"type": "string"},
+                            "score": {"type": "integer", "minimum": 1, "maximum": 10},
+                        },
+                        "required": ["id", "summary", "score"],
                     },
                 }
             },
@@ -48,9 +65,13 @@ TOOL = {
 
 
 def add_summaries(items: list[dict]) -> None:
-    """Sets item["summary"] in place. Falls back to the snippet if the call fails."""
+    """Sets item["summary"] and item["score"] in place.
+
+    If the call fails, summaries fall back to the snippet and scores stay None.
+    """
     for item in items:
         item["summary"] = item["snippet"][:200]
+        item["score"] = None
     if not items:
         return
 
@@ -60,7 +81,7 @@ def add_summaries(items: list[dict]) -> None:
         response = BEDROCK.converse(
             modelId=MODEL_ID,
             messages=[{"role": "user", "content": [{"text": PROMPT.format(items=json.dumps(payload))}]}],
-            inferenceConfig={"maxTokens": 8000},
+            inferenceConfig={"maxTokens": 16000},
             toolConfig={"tools": [TOOL], "toolChoice": {"tool": {"name": "save_summaries"}}},
         )
         if response["stopReason"] != "tool_use":
@@ -72,8 +93,14 @@ def add_summaries(items: list[dict]) -> None:
             summaries = json.loads(summaries)
         for entry in summaries:
             i = entry.get("id")
-            if isinstance(i, int) and 0 <= i < len(items) and str(entry.get("summary", "")).strip():
+            if not (isinstance(i, int) and 0 <= i < len(items)):
+                continue
+            if str(entry.get("summary", "")).strip():
                 items[i]["summary"] = entry["summary"].strip()
+            try:
+                items[i]["score"] = max(1, min(10, int(entry.get("score"))))
+            except (TypeError, ValueError):
+                pass
         usage = response.get("usage", {})
         log.info("Summarized %d of %d items (%s in / %s out tokens)", len(summaries), len(items),
                  usage.get("inputTokens"), usage.get("outputTokens"))

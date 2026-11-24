@@ -55,7 +55,7 @@ def _item(section, source, title, url, snippet="", published=None, extra=""):
         "title": _clean(title, 200),
         "url": url.strip(),
         "snippet": _clean(snippet),
-        "published": published.isoformat() if published else None,
+        "published": published.astimezone(timezone.utc).isoformat() if published else None,
         "extra": extra,
     }
 

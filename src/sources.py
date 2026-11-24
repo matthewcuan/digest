@@ -33,8 +33,15 @@ HN_KEYWORDS = (
 # GitHub repos created in the last week with these topics, ranked by stars.
 GITHUB_TOPICS = ("llm", "ai-agents", "generative-ai", "machine-learning")
 
-# Per-section caps so the email stays short.
+# Per-section caps so the email stays short. Haiku's scores pick which items fill them.
 MAX_PER_SECTION = {"blogs": 20, "news": 15, "hn": 10, "github": 10}
+
+# Most items sent to Haiku for scoring in one run (newest first).
+MAX_CANDIDATES = 150
+
+# Items Haiku scores below this (1-10) are left out even if a section has room.
+# Duplicate coverage of the same story and spam repos score 1.
+MIN_SCORE = 3
 
 # How far back to look for new posts. Repeats are filtered out separately.
 LOOKBACK_HOURS = 36

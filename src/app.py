@@ -76,19 +76,31 @@ def _render(items: list[dict], today: str) -> str:
 def handler(event, context):
     dry_run = bool((event or {}).get("dry_run"))
     items = _unseen(fetch.collect())
-
-    capped = []
-    for key, _ in SECTIONS:
-        capped += [it for it in items if it["section"] == key][: sources.MAX_PER_SECTION[key]]
-    log.info("%d new items, %d after caps", len(items), len(capped))
-    if not capped:
+    if not items:
         return {"sent": False, "reason": "nothing new"}
 
-    add_summaries(capped)
+    # Haiku scores every candidate; keep the count bounded so the call stays cheap.
+    # Dates are UTC ISO strings, so they sort as text. Undated items (HN, GitHub) go last
+    # and, since the sort is stable, keep their source order (points, stars).
+    items.sort(key=lambda it: it["published"] or "", reverse=True)
+    candidates = items[: sources.MAX_CANDIDATES]
+    add_summaries(candidates)
+
+    # Each section shows its top-scored items. Without scores (the call failed),
+    # it falls back to newest first across all sources.
+    capped = []
+    for key, _ in SECTIONS:
+        rows = [it for it in candidates if it["section"] == key
+                and (it["score"] is None or it["score"] >= sources.MIN_SCORE)]
+        rows.sort(key=lambda it: -(it["score"] or 0))  # stable: ties stay newest first
+        capped += rows[: sources.MAX_PER_SECTION[key]]
+    log.info("%d new items, %d scored, %d in email", len(items), len(candidates), len(capped))
     today = datetime.now(TZ).strftime("%A, %B %-d")
     body = _render(capped, today)
     if dry_run:
-        return {"sent": False, "dry_run": True, "items": len(capped), "html": body}
+        return {"sent": False, "dry_run": True, "items": len(capped), "html": body,
+                "scored": [{"section": it["section"], "score": it["score"], "source": it["source"],
+                            "title": it["title"], "shown": it in capped} for it in candidates]}
 
     SES.send_email(
         FromEmailAddress=f"AI Digest <{EMAIL}>",
